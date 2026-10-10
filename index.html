@@ -1,0 +1,63 @@
+<!DOCTYPE html><html lang="zh-Hant"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>智慧家庭・人臉＋語音控制</title>
+<style>
+:root{--bg:#101826;--pn:#192438;--tx:#e9eef7;--mu:#93a3bd;--am:#ffc857;--gr:#5bd6a0;--rd:#ef6b73}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:16px/1.6 "Noto Sans TC","Microsoft JhengHei",system-ui,sans-serif}
+header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:14px 18px}h1{font-size:1.25rem;margin:0}h2{font-size:1rem;margin:0}
+button,input,select{font:inherit}button{background:#26364f;color:var(--tx);border:1px solid #3a4e6e;border-radius:8px;padding:7px 12px;cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}input,select{background:#0d1420;color:var(--tx);border:1px solid #3a4e6e;border-radius:8px;padding:7px 10px;min-width:0}
+button:focus-visible,input:focus-visible,select:focus-visible{outline:3px solid var(--am);outline-offset:2px}
+main{display:grid;grid-template-columns:minmax(0,3fr) minmax(280px,2fr);gap:16px;padding:0 18px 16px}@media(max-width:860px){main{grid-template-columns:1fr}}
+.pn{background:var(--pn);border-radius:12px;padding:14px;display:flex;flex-direction:column;gap:10px;margin-bottom:16px}.row{display:flex;gap:8px;flex-wrap:wrap}.row input{flex:1}
+#house{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+.rm{border-radius:12px;padding:12px;border:1px solid #3a4e6e;transition:background .3s}.rm h3{margin:0 0 8px;font-size:1rem}
+.ch{display:inline-block;margin:3px;padding:3px 10px;border-radius:99px;background:#0d1420;color:var(--mu);font-size:.9rem}.ch.on{background:var(--gr);color:#08231a}
+#door{padding:10px;border-radius:10px;font-weight:700;text-align:center}.note{font-size:.85rem;color:var(--mu);margin:0}
+#cam{position:relative;display:none}#cam video,#cam canvas{width:100%;border-radius:10px;display:block}#cam canvas{position:absolute;left:0;top:0}
+#lg{max-height:180px;overflow:auto;font-size:.9rem;display:flex;flex-direction:column;gap:4px}footer{padding:0 18px 20px}
+</style></head><body>
+<header><h1 id="ti"></h1><button id="lang"></button></header>
+<main><div><div class="pn"><div id="door"></div><div id="house"></div></div>
+<div class="pn"><h2 id="r3"></h2><div class="row"><button id="mic"></button><input id="tx" aria-label="command"><button id="send"></button></div><h2 id="lt"></h2><div id="lg"></div></div></div>
+<div><div class="pn"><h2 id="r1"></h2><div class="row"><input id="nm"><button id="snap"></button></div><div id="ml"></div><p class="note" id="cons"></p><button id="clr"></button></div>
+<div class="pn"><h2 id="r2"></h2><div class="row"><button id="home"></button><button id="leave"></button></div><div id="st" role="status"></div>
+<div id="cam"><video id="v" autoplay muted playsinline></video><canvas id="ov"></canvas></div>
+<div class="row" id="man" style="display:none"><select id="sel"></select><button id="ent"></button></div></div></div></main>
+<footer class="note" id="ft"></footer>
+<script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/dist/face-api.js"></script>
+<script>
+const T={zh:{ti:"智慧家庭・人臉＋語音控制",r1:"1. 登記家庭成員",nm:"名字",snap:"拍照登記",cons:"臉部資料只存在這台裝置的瀏覽器，不會上傳。登記前請取得本人同意。",clr:"清除全部資料",r2:"2. 回家",home:"我回家了",leave:"離開家",ent:"以此身分進入（模擬）",r3:"3. 語音控制",mic:"🎤 說話",send:"送出",ph:"例如：打開客廳的燈",lt:"指令紀錄",simu:"家中設備是虛擬的；人臉辨識可能認錯人、也可能被照片騙過，僅供教學示範，請勿用於真實門鎖。",liv:"客廳",bed:"臥室",kit:"廚房",light:"燈",ac:"冷氣",fan:"風扇",tv:"電視",curtain:"窗簾",lock:"門鎖",lk:"🔒 已上鎖",ul:"🔓 已解鎖：",load:"載入模型中…",nocam:"無法使用攝影機或載入模型，請改用下方「以此身分進入（模擬）」。",noface:"沒有偵測到臉，請正對鏡頭再試",noname:"請先輸入名字",saved:"已登記：",welcome:"歡迎回家，",unk:"辨識中…陌生人或尚未登記，保持上鎖",deny:"尚未解鎖，語音控制停用",done:"✓ 已執行",nocmd:"聽不懂這個指令",nosr:"這個瀏覽器不支援語音辨識，請改用文字輸入",merr:"語音辨識失敗，請再試或改用文字輸入",none:"尚無成員",del:"刪除",l:"Tiếng Việt",sl:"zh-TW"},
+vi:{ti:"Nhà thông minh: khuôn mặt + giọng nói",r1:"1. Đăng ký thành viên",nm:"Tên",snap:"Chụp và đăng ký",cons:"Dữ liệu khuôn mặt chỉ lưu trong trình duyệt của thiết bị này, không tải lên. Cần có sự đồng ý của người đó trước khi đăng ký.",clr:"Xóa toàn bộ dữ liệu",r2:"2. Về nhà",home:"Tôi về nhà",leave:"Rời nhà",ent:"Vào bằng thành viên này (mô phỏng)",r3:"3. Điều khiển bằng giọng nói",mic:"🎤 Nói",send:"Gửi",ph:"Ví dụ: bật đèn phòng khách",lt:"Nhật ký lệnh",simu:"Thiết bị trong nhà là ảo; nhận diện khuôn mặt có thể nhầm người hoặc bị ảnh đánh lừa, chỉ dùng để học, đừng dùng cho khóa cửa thật.",liv:"Phòng khách",bed:"Phòng ngủ",kit:"Bếp",light:"Đèn",ac:"Điều hòa",fan:"Quạt",tv:"TV",curtain:"Rèm",lock:"Khóa cửa",lk:"🔒 Đã khóa",ul:"🔓 Đã mở khóa: ",load:"Đang tải mô hình…",nocam:"Không dùng được camera hoặc không tải được mô hình, hãy dùng nút «Vào bằng thành viên này (mô phỏng)» bên dưới.",noface:"Không thấy khuôn mặt, hãy nhìn thẳng vào camera và thử lại",noname:"Hãy nhập tên trước",saved:"Đã đăng ký: ",welcome:"Chào mừng về nhà, ",unk:"Đang nhận diện… người lạ hoặc chưa đăng ký, giữ khóa",deny:"Chưa mở khóa, giọng nói bị tắt",done:"✓ Đã thực hiện",nocmd:"Không hiểu lệnh này",nosr:"Trình duyệt này không hỗ trợ nhận giọng nói, hãy gõ lệnh",merr:"Nhận giọng nói lỗi, hãy thử lại hoặc gõ lệnh",none:"Chưa có thành viên",del:"Xóa",l:"繁體中文",sl:"vi-VN"}};
+const $=s=>document.querySelector(s),t=k=>T[L][k],R=['liv','bed','kit'],U='https://cdn.jsdelivr.net/npm/@vladmandic/face-api@1.7.12/model/';
+const DV={light:['燈','đèn'],ac:['冷氣','điều hòa','máy lạnh'],fan:['風扇','quạt'],tv:['電視','tivi','tv'],curtain:['窗簾','rèm'],lock:['門鎖','khóa','cửa']},RM={liv:['客廳','phòng khách'],bed:['臥室','phòng ngủ'],kit:['廚房','bếp']},ON=['開','bật','mở'],OFF=['關','tắt','đóng'];
+let L='zh',M=[],user=null,stream=null,ready=0,scan=0,H;
+try{M=JSON.parse(localStorage.getItem('fm')||'[]')}catch(e){}
+const save=()=>{try{localStorage.setItem('fm',JSON.stringify(M))}catch(e){}};
+const reset=()=>H={lock:1,liv:{light:0,ac:0,fan:0,tv:0,curtain:0,temp:26},bed:{light:0,ac:0,fan:0,curtain:0,temp:26},kit:{light:0,fan:0}};reset();
+const st=m=>$('#st').textContent=m,log=m=>{const d=document.createElement('div');d.textContent=m;$('#lg').prepend(d)};
+function render(){$('#door').textContent=H.lock?t('lk'):t('ul')+user;$('#door').style.cssText=`background:${H.lock?'#4a2530':'#1f4a3a'}`;
+$('#house').innerHTML=R.map(r=>`<div class="rm" style="background:${H[r].light?'#5a4720':'#18212f'}"><h3>${t(r)}</h3>${Object.keys(H[r]).filter(d=>d!='temp').map(d=>`<span class="ch ${H[r][d]?'on':''}">${t(d)}${d=='ac'&&H[r].ac?' '+H[r].temp+'°C':''}</span>`).join('')}</div>`).join('');
+$('#ml').innerHTML=M.length?M.map((m,i)=>`<div class="row" style="align-items:center"><span style="flex:1">${m.n}</span><button onclick="del(${i})">${t('del')}</button></div>`).join(''):`<p class="note">${t('none')}</p>`;
+$('#sel').innerHTML=M.map((m,i)=>`<option value="${i}">${m.n}</option>`).join('');$('#mic').disabled=$('#send').disabled=$('#tx').disabled=!user}
+function ui(){document.documentElement.lang=L=='zh'?'zh-Hant':'vi';[['ti'],['r1'],['r2'],['r3'],['lt'],['cons'],['clr'],['snap'],['home'],['leave'],['ent'],['mic'],['send'],['ft','simu'],['lang','l']].forEach(([i,k])=>$('#'+i).textContent=t(k||i));$('#nm').placeholder=t('nm');$('#tx').placeholder=t('ph');render()}
+function del(i){M.splice(i,1);save();render()}
+const U_=async()=>{if(ready)return;st(t('load'));await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(U),faceapi.nets.faceLandmark68Net.loadFromUri(U),faceapi.nets.faceRecognitionNet.loadFromUri(U)]);ready=1};
+async function cam(){if(!stream){stream=await navigator.mediaDevices.getUserMedia({video:{facingMode:'user'}});$('#v').srcObject=stream;$('#cam').style.display='block';await $('#v').play()}}
+function stop(){scan=0;stream&&stream.getTracks().forEach(x=>x.stop());stream=null;$('#v').srcObject=null;$('#cam').style.display='none'}
+const det=()=>faceapi.detectSingleFace($('#v'),new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+const fail=()=>{stop();st(t('nocam'));$('#man').style.display='flex'};
+$('#snap').onclick=async()=>{const n=$('#nm').value.trim();if(!n)return st(t('noname'));try{await U_();await cam();await new Promise(r=>setTimeout(r,800));const d=await det();stop();if(!d)return st(t('noface'));M.push({n,d:Array.from(d.descriptor)});save();$('#nm').value='';st(t('saved')+n);render()}catch(e){fail()}};
+$('#clr').onclick=()=>{M=[];save();render()};
+function enter(n){user=n;stop();H.lock=0;st(t('welcome')+n);log(t('welcome')+n);render()}
+$('#home').onclick=async()=>{try{await U_();await cam();scan=1;st(t('unk'));loop()}catch(e){fail()}};
+async function loop(){if(!scan)return;try{const d=await det(),v=$('#v'),o=$('#ov'),c=o.getContext('2d');o.width=v.videoWidth;o.height=v.videoHeight;c.clearRect(0,0,o.width,o.height);
+if(d){const b=d.detection.box;c.strokeStyle='#ffc857';c.lineWidth=3;c.strokeRect(b.x,b.y,b.width,b.height);let best=null,bd=9;M.forEach(m=>{const x=faceapi.euclideanDistance(d.descriptor,Float32Array.from(m.d));if(x<bd){bd=x;best=m}});if(best&&bd<.5)return enter(best.n)}}catch(e){}setTimeout(loop,500)}
+$('#leave').onclick=()=>{stop();user=null;reset();st('');render()};
+$('#ent').onclick=()=>{const m=M[$('#sel').value];m&&enter(m.n)};
+function parse(s){s=s.toLowerCase();if(/全部關閉|tắt tất cả|tắt hết/.test(s)){R.forEach(r=>Object.keys(H[r]).forEach(d=>{if(d!='temp')H[r][d]=0}));H.lock=1;return 1}
+const rs=R.filter(r=>RM[r].some(w=>s.includes(w))),ds=Object.keys(DV).filter(d=>DV[d].some(w=>s.includes(w))),tp=ds.includes('ac')&&s.match(/(\d{2})/);let off=OFF.some(w=>s.includes(w)),on=!off&&ON.some(w=>s.includes(w));if(tp)on=true;if(!ds.length||(!on&&!off))return 0;
+ds.forEach(d=>{if(d=='lock')H.lock=off?1:0;else(rs.length?rs:R).forEach(r=>{if(d in H[r]){H[r][d]=on?1:0;if(tp&&d=='ac')H[r].temp=Math.min(30,Math.max(16,+tp[1]))}})});return 1}
+function run(s){if(!user)return log(t('deny'));const ok=parse(s);log(`${user}: ${s} → ${ok?t('done'):t('nocmd')}`);render()}
+$('#send').onclick=()=>{const s=$('#tx').value.trim();if(s){run(s);$('#tx').value=''}};$('#tx').onkeydown=e=>{if(e.key=='Enter')$('#send').click()};
+$('#mic').onclick=()=>{const SR=window.SpeechRecognition||window.webkitSpeechRecognition;if(!SR)return log(t('nosr'));const r=new SR();r.lang=t('sl');r.onresult=e=>run(e.results[0][0].transcript);r.onerror=()=>log(t('merr'));r.start()};
+$('#lang').onclick=()=>{L=L=='zh'?'vi':'zh';ui()};ui();
+</script></body></html>
